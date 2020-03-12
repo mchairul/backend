@@ -9,19 +9,17 @@
 |
 */
 include "config.php";
-ini_set('max_execution_time', 3000);
 //read and check POST param from android app
-if (!isset($_POST["cid"]) && !isset($_POST["tryno"]) && !isset($_POST["username"]) && !isset($_POST["passwd"])) {
-	echo "not completed";
-	exit();
+if (!isset($_POST["msisdn"]) && !isset($_POST["retry"])) {
+    echo "not completed";
+    exit();
 }
+define('APIKEY', 'YOU_APIKEY');
 $data = array(
-    "userid" => $_POST["username"],
-    "msisdn" => $_POST["cid"],
-    "password" => $_POST["passwd"],
-	"gateway" => $_POST["tryno"],
+    "msisdn" => $_POST["msisdn"],
+    "retry" => $_POST["retry"]
 );
-$url = "http://104.199.196.122/gateway/v1/call";
+$url = "http://104.199.196.122/gateway/v3/asynccall";
 $content = json_encode($data);
 $curl = curl_init($url);
 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
@@ -29,28 +27,39 @@ curl_setopt($curl, CURLOPT_POSTFIELDS, $content);
 curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($curl, CURLOPT_HTTPHEADER, array(
     'Content-Type: application/json',
+    'Authorization: Apikey ' . APIKEY,
     'Content-Length: ' . strlen($content))
 );
 $json_response = curl_exec($curl);
 $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 curl_close($curl);
 $data =  json_decode($json_response);
+$error = TRUE;
 
 $rc = $data->rc;
-$trx_id = $data->trx_id;
-$msisdn = $data->msisdn;
-$via = $data->via;
-$token = $data->token;
-$dial_code = $data->dial_code;
-$dial_status = $data->dial_status;
-$call_status = $data->call_status;
-$result = $data->result;
+if($rc == 0) {
+    $error = FALSE;
+    $trxid = $data->trxid;
+    $msisdn = $data->msisdn;
+    $token = $data->token;
+    $length = strlen($token);
 
+    $first_token = substr($token, 0, -4);
 
-$sql = "insert into `call_data`
-		(trx_id,msisdn,via,token,dial_code,dial_status,call_status,result,is_done) 
-		values 
-		('$trx_id','$msisdn','$via','$token','$dial_code','$dial_status','$call_status','$result',0)";
-$db->query($sql);
-echo $json_response;
-?>
+    $sql = "insert into `call_data` (trxid,msisdn,token,is_done) values ('$trxid','$msisdn','$token',0)";
+    $db->query($sql);
+
+    $return = array(
+        "error" => $error,
+        "trxid" => $trxid,
+        "first_token" => $first_token,
+        "length" => $length
+    );
+} else {
+    $info = $data->info;
+    $return = array(
+        "error" => $error,
+        "info" => $info
+    );
+}
+echo json_encode($return);

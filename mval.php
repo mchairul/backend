@@ -1,5 +1,4 @@
 <?php
-<?php
 /*
 |-------------------------------------------------------------------
 | VERIFICATION
@@ -7,21 +6,28 @@
 | example of call verification
 |
 */
-ini_set('max_execution_time', 3000);
 header("Content-type: application/json");
+
+if (!isset($_POST["trxid"]) && !isset($_POST["code"])) {
+     echo "not completed";
+     exit();
+}
+
 include "config.php";
-$sql="SELECT id FROM call_data WHERE trx_id='$trxId' AND token=$token AND result='Success'";
+$sql = "SELECT trxid FROM call_data WHERE trxid='" . $_POST["trxid"] . "' AND token='" . $_POST["code"] . "' and is_done = 0";
 //echo $sql;
-$result=$db->query($sql);
-$valid="invalid";
+$result = $db->query($sql);
+$error = TRUE;
+$info = "invalid token";
 if ($result->num_rows > 0) {
-	$sqlu="UPDATE call_data SET is_done=1 WHERE trx_id='$trxId'";
-	$db->query($sqlu);
-	$valid="valid";
+     $sqlu = "UPDATE call_data SET is_done  = 1 WHERE trxid = '" . $_POST["trxid"] . "'";
+     $db->query($sqlu);
+     $info = "ok";
+     $error = FALSE;
 }
 $db->close();
 $resp=array(
-	"error" => FALSE,
-	"valid" => $valid
+     "error" => $error,
+     "info" => $info
 );
 echo json_encode($resp);
